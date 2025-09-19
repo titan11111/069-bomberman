@@ -1,402 +1,1666 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-  <title>ゼルダ風ミニゲーム v1</title>
-  <style>
-    :root{
-      --bg:#0b1020;
-      --panel:#111827cc;
-      --accent:#38bdf8;
-      --accent2:#a78bfa;
-      --text:#e5e7eb;
-      --muted:#9ca3af;
-      --shadow: 0 10px 30px rgba(0,0,0,.35);
-    }
-    *{box-sizing:border-box;}
-    html,body{height:100%;}
-    body{
-      margin:0; background:
-        radial-gradient(1200px 700px at 70% -20%, #1f2937 0%, #0b1020 60%),
-        radial-gradient(800px 600px at -10% 110%, #111827 0%, #0b1020 70%);
-      color:var(--text); font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans JP", Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
-      display:flex; flex-direction:column; align-items:center; gap:12px; padding:16px 12px 96px;
-    }
-    header{width:100%; max-width:920px; display:flex; align-items:center; justify-content:space-between; gap:12px;}
-    .title{display:flex; align-items:center; gap:10px;}
-    .logo{width:40px; height:40px; border-radius:12px; background:linear-gradient(135deg,#38bdf8,#a78bfa); box-shadow:var(--shadow);}    
-    h1{font-size:20px; margin:0; letter-spacing:.03em;}
-    .btn{border:1px solid #334155; color:var(--text); background:linear-gradient(180deg,#0f172a,#0b1329); padding:8px 12px; border-radius:12px; cursor:pointer; display:inline-flex; gap:8px; align-items:center; box-shadow:var(--shadow);}
-    .btn:hover{border-color:#475569}
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-touch-fullscreen" content="yes">
+    <title>ボンバーマンGB</title>
+    <style>
+        /* 全体のスタイル */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
 
-    .frame{position:relative; width:100%; max-width:920px; aspect-ratio:32/27; border-radius:20px; overflow:hidden; background:#0a0f1e; box-shadow:var(--shadow); border:1px solid #22314d;}
-    canvas{width:100%; height:100%; image-rendering: pixelated; display:block;}
+        body {
+            font-family: 'Courier New', monospace;
+            background: linear-gradient(135deg, #1a3d0f 0%, #2d5016 50%, #1a3d0f 100%);
+            color: #ffffff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 0;
+            overflow: hidden;
+            position: fixed;
+            width: 100%;
+            height: 100%;
+        }
 
-    .hud{position:absolute; inset:12px; pointer-events:none;}
+        #gameContainer {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            max-width: 100vw;
+            height: 100vh;
+            background: linear-gradient(145deg, #2a2a2a 0%, #1a1a1a 100%);
+            border-radius: 15px;
+            box-shadow: 
+                0 0 30px rgba(0, 255, 0, 0.2),
+                inset 0 0 20px rgba(255, 255, 255, 0.1);
+            padding: 10px;
+            position: relative;
+        }
 
-    .dialog{position:absolute; left:50%; transform:translateX(-50%); bottom:10px; width:min(92%,820px); background:var(--panel); border:1px solid #273244; border-radius:16px; padding:10px 14px; display:none;}
-    .dialog.show{display:block;}
+        /* ヘッダー情報 */
+        #gameHeader {
+            width: 100%;
+            max-width: 450px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            padding: 8px 15px;
+            background: linear-gradient(90deg, #333 0%, #444 50%, #333 100%);
+            border-radius: 12px;
+            border: 2px solid #555;
+            box-shadow: inset 0 2px 4px rgba(255, 255, 255, 0.1);
+        }
 
-    .mobile-only{display:none}
+        .header-section {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            flex: 1;
+        }
 
-    /* On-screen controls */
-    @media (hover:none){
-      .mobile-only{display:block}
-      .pad{position:fixed; left:14px; bottom:14px; width:160px; height:160px; opacity:.96;}
-      .pad .btnDir{position:absolute; width:56px; height:56px; border-radius:12px; border:1px solid #2b3a58; background:#0c1530cc; color:#94a3b8; display:flex; align-items:center; justify-content:center; user-select:none; touch-action:none;}
-      .pad .btnDir:active{background:#0d1b42}
-      .pad .u{left:52px; top:0}
-      .pad .d{left:52px; bottom:0}
-      .pad .l{left:0; top:52px}
-      .pad .r{right:0; top:52px}
+        .header-label {
+            font-size: 10px;
+            color: #aaa;
+            margin-bottom: 2px;
+        }
 
-      .action{position:fixed; right:18px; bottom:28px; display:flex; gap:14px;}
-      .action .btnAct{width:72px; height:72px; border-radius:50%; border:2px solid #2b3a58; background:radial-gradient(circle at 30% 30%, #1a2a55, #0c1530); color:#dbeafe; font-weight:700; font-size:14px; display:flex; align-items:center; justify-content:center; user-select:none; touch-action:none;}
-      .action .btnAct:active{transform:scale(.98)}
-    }
+        .header-value {
+            font-size: 14px;
+            font-weight: bold;
+            color: #fff;
+            text-shadow: 0 0 5px rgba(255, 255, 0, 0.5);
+        }
 
-    footer{position:fixed; left:0; right:0; bottom:10px; display:flex; justify-content:center;}
-    .bar{display:flex; gap:8px; align-items:center; background:var(--panel); border:1px solid #273244; padding:6px 10px; border-radius:999px; font-size:12px;}
-    .pill{padding:6px 10px; border-radius:999px; background:#0b1329; border:1px solid #22314d; color:#9fb4d6}
-  </style>
+        /* パワーアップ表示 */
+        #powerUpDisplay {
+            width: 100%;
+            max-width: 450px;
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin-bottom: 8px;
+            flex-wrap: wrap;
+        }
+
+        .power-item {
+            background: linear-gradient(145deg, #444 0%, #333 100%);
+            padding: 5px 12px;
+            border-radius: 20px;
+            border: 2px solid #555;
+            font-size: 11px;
+            min-width: 65px;
+            text-align: center;
+            box-shadow: 
+                0 2px 5px rgba(0, 0, 0, 0.3),
+                inset 0 1px 2px rgba(255, 255, 255, 0.2);
+            transition: all 0.3s ease;
+        }
+
+        .power-item:nth-child(1) { border-color: #ff6600; }
+        .power-item:nth-child(2) { border-color: #ff0066; }
+        .power-item:nth-child(3) { border-color: #0066ff; }
+
+        /* ゲーム画面 */
+        #gameCanvas {
+            border: 3px solid #666;
+            background-color: #000;
+            image-rendering: pixelated;
+            image-rendering: -moz-crisp-edges;
+            image-rendering: crisp-edges;
+            border-radius: 8px;
+            box-shadow: 
+                0 0 20px rgba(0, 255, 0, 0.3),
+                inset 0 0 10px rgba(0, 0, 0, 0.5);
+            max-width: calc(100vw - 20px);
+            max-height: calc(100vh - 200px);
+        }
+
+        /* 開始画面 */
+        #startScreen {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: linear-gradient(145deg, rgba(0, 0, 0, 0.95) 0%, rgba(30, 30, 30, 0.95) 100%);
+            padding: 30px;
+            border-radius: 20px;
+            text-align: center;
+            border: 3px solid #ffff00;
+            box-shadow: 
+                0 0 30px rgba(255, 255, 0, 0.5),
+                inset 0 0 20px rgba(255, 255, 255, 0.1);
+            max-width: 90%;
+            backdrop-filter: blur(10px);
+        }
+
+        #startScreen h1 {
+            font-size: 32px;
+            margin-bottom: 20px;
+            background: linear-gradient(45deg, #ffff00, #ff6600);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-shadow: 2px 2px 4px #000;
+        }
+
+        #instructions {
+            margin-bottom: 25px;
+            text-align: left;
+        }
+
+        #instructions h2 {
+            font-size: 18px;
+            margin-bottom: 15px;
+            color: #00ff66;
+            text-align: center;
+            text-shadow: 0 0 10px rgba(0, 255, 102, 0.5);
+        }
+
+        #instructions p {
+            margin-bottom: 8px;
+            font-size: 14px;
+            padding: 8px 12px;
+            background: linear-gradient(90deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
+            border-radius: 8px;
+            border-left: 3px solid #00ff66;
+        }
+
+        .game-button {
+            background: linear-gradient(145deg, #ff6600 0%, #ff3300 100%);
+            color: white;
+            border: none;
+            padding: 15px 35px;
+            font-size: 18px;
+            font-weight: bold;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 
+                0 4px 15px rgba(255, 102, 0, 0.4),
+                inset 0 2px 4px rgba(255, 255, 255, 0.2);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .game-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 
+                0 6px 20px rgba(255, 102, 0, 0.6),
+                inset 0 2px 4px rgba(255, 255, 255, 0.3);
+        }
+
+        .game-button:active {
+            transform: translateY(0px);
+            box-shadow: 
+                0 2px 10px rgba(255, 102, 0, 0.4),
+                inset 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        /* ゲームオーバー・クリア画面 */
+        #gameOverScreen, #clearScreen {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: linear-gradient(145deg, rgba(0, 0, 0, 0.95) 0%, rgba(30, 30, 30, 0.95) 100%);
+            padding: 30px;
+            border-radius: 20px;
+            text-align: center;
+            max-width: 90%;
+            backdrop-filter: blur(15px);
+        }
+
+        #gameOverScreen {
+            border: 3px solid #ff0000;
+            box-shadow: 0 0 30px rgba(255, 0, 0, 0.5);
+        }
+
+        #clearScreen {
+            border: 3px solid #00ff00;
+            box-shadow: 0 0 30px rgba(0, 255, 0, 0.5);
+        }
+
+        #gameOverScreen h1 {
+            background: linear-gradient(45deg, #ff0000, #ff6600);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-size: 24px;
+            margin-bottom: 15px;
+        }
+
+        #clearScreen h1 {
+            background: linear-gradient(45deg, #00ff00, #00ff66);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-size: 24px;
+            margin-bottom: 15px;
+        }
+
+        /* コントローラーUI */
+        #mobileControls {
+            display: none;
+            position: fixed;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: calc(100% - 20px);
+            max-width: 450px;
+            height: 140px;
+            background: linear-gradient(145deg, rgba(40, 40, 40, 0.95) 0%, rgba(20, 20, 20, 0.95) 100%);
+            border-radius: 20px;
+            border: 2px solid #555;
+            box-shadow: 
+                0 -5px 25px rgba(0, 0, 0, 0.5),
+                inset 0 2px 10px rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(15px);
+            padding: 15px;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* 十字キー */
+        #dpad {
+            position: relative;
+            width: 110px;
+            height: 110px;
+        }
+
+        .dpad-center {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 35px;
+            height: 35px;
+            background: linear-gradient(145deg, #222 0%, #111 100%);
+            border-radius: 50%;
+            border: 2px solid #444;
+            box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.8);
+        }
+
+        .dpad-btn {
+            position: absolute;
+            background: linear-gradient(145deg, #555 0%, #333 100%);
+            border: 2px solid #666;
+            border-radius: 12px;
+            color: white;
+            font-size: 20px;
+            font-weight: bold;
+            cursor: pointer;
+            user-select: none;
+            touch-action: manipulation;
+            transition: all 0.15s ease;
+            box-shadow: 
+                0 3px 8px rgba(0, 0, 0, 0.4),
+                inset 0 1px 3px rgba(255, 255, 255, 0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .dpad-btn:active {
+            background: linear-gradient(145deg, #777 0%, #555 100%);
+            transform: scale(0.95);
+            box-shadow: 
+                0 1px 3px rgba(0, 0, 0, 0.6),
+                inset 0 2px 5px rgba(0, 0, 0, 0.3);
+        }
+
+        #upBtn {
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 35px;
+            height: 30px;
+        }
+
+        #downBtn {
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 35px;
+            height: 30px;
+        }
+
+        #leftBtn {
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 30px;
+            height: 35px;
+        }
+
+        #rightBtn {
+            right: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 30px;
+            height: 35px;
+        }
+
+        /* アクションボタン */
+        #actionButtons {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .action-btn {
+            width: 65px;
+            height: 65px;
+            border-radius: 50%;
+            border: 3px solid;
+            color: white;
+            font-size: 24px;
+            cursor: pointer;
+            user-select: none;
+            touch-action: manipulation;
+            transition: all 0.15s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .action-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(145deg, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0) 100%);
+            border-radius: 50%;
+        }
+
+        #bombBtn {
+            background: linear-gradient(145deg, #ff6600 0%, #cc3300 100%);
+            border-color: #ff8833;
+            box-shadow: 
+                0 4px 12px rgba(255, 102, 0, 0.4),
+                inset 0 2px 4px rgba(255, 255, 255, 0.3);
+        }
+
+        #bombBtn:active {
+            background: linear-gradient(145deg, #cc4400 0%, #aa2200 100%);
+            transform: scale(0.92);
+            box-shadow: 
+                0 2px 6px rgba(255, 102, 0, 0.6),
+                inset 0 3px 8px rgba(0, 0, 0, 0.4);
+        }
+
+        #pauseBtn {
+            background: linear-gradient(145deg, #666 0%, #444 100%);
+            border-color: #888;
+            box-shadow: 
+                0 4px 12px rgba(0, 0, 0, 0.4),
+                inset 0 2px 4px rgba(255, 255, 255, 0.2);
+        }
+
+        #pauseBtn:active {
+            background: linear-gradient(145deg, #555 0%, #333 100%);
+            transform: scale(0.92);
+            box-shadow: 
+                0 2px 6px rgba(0, 0, 0, 0.6),
+                inset 0 3px 8px rgba(0, 0, 0, 0.4);
+        }
+
+        /* レスポンシブデザイン */
+        @media screen and (max-width: 768px) {
+            body {
+                background: linear-gradient(135deg, #1a3d0f 0%, #2d5016 100%);
+            }
+
+            #gameContainer {
+                border-radius: 0;
+                height: 100vh;
+                padding: 5px;
+            }
+
+            #gameHeader {
+                max-width: 100%;
+                font-size: 12px;
+                padding: 6px 10px;
+            }
+
+            .header-label {
+                font-size: 8px;
+            }
+
+            .header-value {
+                font-size: 12px;
+            }
+
+            #powerUpDisplay {
+                max-width: 100%;
+                gap: 5px;
+            }
+
+            .power-item {
+                font-size: 9px;
+                padding: 3px 8px;
+                min-width: 55px;
+            }
+
+            #gameCanvas {
+                max-height: calc(100vh - 180px);
+                border-width: 2px;
+            }
+
+            #mobileControls {
+                display: flex;
+                height: 120px;
+            }
+
+            #dpad {
+                width: 95px;
+                height: 95px;
+            }
+
+            .dpad-center {
+                width: 30px;
+                height: 30px;
+            }
+
+            .dpad-btn {
+                font-size: 16px;
+            }
+
+            #upBtn, #downBtn {
+                width: 30px;
+                height: 25px;
+            }
+
+            #leftBtn, #rightBtn {
+                width: 25px;
+                height: 30px;
+            }
+
+            .action-btn {
+                width: 55px;
+                height: 55px;
+                font-size: 20px;
+            }
+
+            #startScreen, #gameOverScreen, #clearScreen {
+                width: 95%;
+                padding: 20px;
+            }
+
+            #startScreen h1 {
+                font-size: 24px;
+            }
+
+            #instructions p {
+                font-size: 12px;
+            }
+        }
+
+        @media screen and (max-width: 480px) {
+            #gameHeader {
+                flex-wrap: wrap;
+                gap: 5px;
+                padding: 8px;
+            }
+
+            .header-section {
+                flex: 1;
+                min-width: 80px;
+            }
+
+            #powerUpDisplay {
+                flex-wrap: wrap;
+                gap: 3px;
+            }
+
+            .power-item {
+                font-size: 8px;
+                padding: 2px 6px;
+                min-width: 50px;
+            }
+
+            #gameCanvas {
+                max-height: calc(100vh - 200px);
+            }
+
+            #mobileControls {
+                height: 100px;
+                padding: 10px;
+            }
+
+            #dpad {
+                width: 80px;
+                height: 80px;
+            }
+
+            .dpad-center {
+                width: 25px;
+                height: 25px;
+            }
+
+            .dpad-btn {
+                font-size: 14px;
+            }
+
+            #upBtn, #downBtn {
+                width: 25px;
+                height: 20px;
+            }
+
+            #leftBtn, #rightBtn {
+                width: 20px;
+                height: 25px;
+            }
+
+            .action-btn {
+                width: 45px;
+                height: 45px;
+                font-size: 16px;
+                border-width: 2px;
+            }
+
+            #actionButtons {
+                gap: 8px;
+            }
+        }
+
+        @media screen and (max-height: 600px) {
+            #gameCanvas {
+                max-height: calc(100vh - 220px);
+            }
+
+            #mobileControls {
+                height: 90px;
+            }
+
+            .action-btn {
+                width: 40px;
+                height: 40px;
+                font-size: 14px;
+            }
+
+            #dpad {
+                width: 70px;
+                height: 70px;
+            }
+        }
+
+        /* iOS Safari対応 */
+        @supports (-webkit-appearance: none) {
+            body {
+                -webkit-overflow-scrolling: touch;
+            }
+            
+            #gameContainer {
+                -webkit-backface-visibility: hidden;
+                backface-visibility: hidden;
+            }
+        }
+
+        /* ダークモード対応 */
+        @media (prefers-color-scheme: dark) {
+            body {
+                background: linear-gradient(135deg, #0a1a05 0%, #1a3d0f 50%, #0a1a05 100%);
+            }
+        }
+    </style>
 </head>
 <body>
-  <header>
-    <div class="title">
-      <div class="logo"></div>
-      <h1>ゼルダ風ミニゲーム v1（HTML/CSS/JS）</h1>
+    <div id="gameContainer">
+        <!-- ゲーム情報表示エリア -->
+        <div id="gameHeader">
+            <div class="header-section">
+                <div class="header-label">ROUND</div>
+                <div class="header-value" id="round">1</div>
+            </div>
+            <div class="header-section">
+                <div class="header-label">LIVES</div>
+                <div class="header-value" id="lives">3</div>
+            </div>
+            <div class="header-section">
+                <div class="header-label">SCORE</div>
+                <div class="header-value" id="score">0</div>
+            </div>
+        </div>
+
+        <!-- パワーアップアイテム表示 -->
+        <div id="powerUpDisplay">
+            <div class="power-item">
+                💣 <span id="bombCount">1</span>
+            </div>
+            <div class="power-item">
+                🔥 <span id="firepower">1</span>
+            </div>
+            <div class="power-item">
+                ⚡ <span id="speed">1.0</span>
+            </div>
+        </div>
+
+        <!-- ゲーム画面 -->
+        <canvas id="gameCanvas" width="416" height="352"></canvas>
+
+        <!-- ゲーム開始/操作説明 -->
+        <div id="startScreen">
+            <h1>ボンバーマンGB</h1>
+            <div id="instructions">
+                <h2>🎮 操作方法</h2>
+                <p>🕹️ 移動: 矢印キー / 十字キー</p>
+                <p>💣 爆弾: Aキー/スペース / 爆弾ボタン</p>
+                <p>⏸️ ポーズ: Pキー / ポーズボタン</p>
+                <p>🎯 目標: 敵を全て倒して出口へ脱出！</p>
+                <p>💎 アイテムで強化して高スコアを狙おう</p>
+            </div>
+            <button id="startButton" class="game-button">ゲーム開始</button>
+        </div>
+
+        <!-- ゲームオーバー画面 -->
+        <div id="gameOverScreen" style="display: none;">
+            <h1>💥 GAME OVER 💥</h1>
+            <p style="font-size: 18px; margin: 15px 0;">最終スコア: <span id="finalScore" style="color: #ffff00;">0</span></p>
+            <button id="restartButton" class="game-button">もう一度プレイ</button>
+        </div>
+
+        <!-- クリア画面 -->
+        <div id="clearScreen" style="display: none;">
+            <h1>🎉 ステージクリア！ 🎉</h1>
+            <p style="font-size: 18px; margin: 15px 0;">スコア: <span id="clearScore" style="color: #00ff00;">0</span></p>
+            <button id="nextButton" class="game-button">次のラウンド</button>
+        </div>
     </div>
-    <button id="helpBtn" class="btn" aria-label="ヘルプ">❓ ヘルプ</button>
-  </header>
 
-  <div class="frame">
-    <canvas id="game" width="320" height="270" aria-label="ゲーム画面"></canvas>
-    <div class="hud">
-      <div id="dialog" class="dialog" role="dialog" aria-live="polite"></div>
+    <!-- モバイル専用コントローラー -->
+    <div id="mobileControls">
+        <div id="dpad">
+            <div class="dpad-center"></div>
+            <button id="upBtn" class="dpad-btn">↑</button>
+            <button id="downBtn" class="dpad-btn">↓</button>
+            <button id="leftBtn" class="dpad-btn">←</button>
+            <button id="rightBtn" class="dpad-btn">→</button>
+        </div>
+        <div id="actionButtons">
+            <button id="bombBtn" class="action-btn">💣</button>
+            <button id="pauseBtn" class="action-btn">⏸️</button>
+        </div>
     </div>
-  </div>
 
-  <!-- Mobile Controls -->
-  <div class="mobile-only pad" aria-hidden="true">
-    <div class="btnDir u" data-dir="up">▲</div>
-    <div class="btnDir d" data-dir="down">▼</div>
-    <div class="btnDir l" data-dir="left">◀</div>
-    <div class="btnDir r" data-dir="right">▶</div>
-  </div>
-  <div class="mobile-only action" aria-hidden="true">
-    <div class="btnAct" id="btnAttack">J</div>
-  </div>
+    <script>
+        // ゲーム設定
+        const GAME_CONFIG = {
+            TILE_SIZE: 32,
+            MAP_WIDTH: 13,
+            MAP_HEIGHT: 11,
+            CANVAS_WIDTH: 416,  // 13 * 32
+            CANVAS_HEIGHT: 352  // 11 * 32
+        };
 
-  <footer>
-    <div class="bar">
-      <span class="pill">v1 基礎実装：移動 / 当たり判定 / 草伐り / 宝箱 / NPC会話 / モバイル操作</span>
-    </div>
-  </footer>
+        // ゲーム状態
+        let gameState = {
+            round: 1,
+            lives: 3,
+            score: 0,
+            isGameRunning: false,
+            isPaused: false,
+            isGameOver: false,
+            playerPowerUps: {
+                bombCount: 1,
+                firepower: 1,
+                speed: 1.0
+            }
+        };
 
-  <script>
-  // ====== Utility & Setup ======
-  const $ = sel => document.querySelector(sel);
-  const canvas = $('#game');
-  const ctx = canvas.getContext('2d');
-  const DPR = Math.max(1, Math.min(3, Math.floor(window.devicePixelRatio||1)));
-  // Keep internal resolution fixed (pixel-art) while letting CSS scale
-  canvas.width = 320 * DPR; canvas.height = 270 * DPR; ctx.imageSmoothingEnabled = false; ctx.scale(DPR, DPR);
+        // ゲーム要素
+        let player = {};
+        let enemies = [];
+        let bombs = [];
+        let explosions = [];
+        let powerUps = [];
+        let gameMap = [];
+        let exit = null;
 
-  const TILE = 16; // px
-  const VW = 320; // virtual width
-  const VH = 270; // virtual height
+        // Canvas とコンテキスト
+        let canvas;
+        let ctx;
 
-  // RNG helper
-  const rand = (a,b)=>Math.floor(Math.random()*(b-a+1))+a;
+        // キーボード入力
+        let keys = {};
 
-  // Input state
-  const input = { up:false, down:false, left:false, right:false, attack:false };
-  const keys = new Map([
-    ['ArrowUp','up'],['KeyW','up'],
-    ['ArrowDown','down'],['KeyS','down'],
-    ['ArrowLeft','left'],['KeyA','left'],
-    ['ArrowRight','right'],['KeyD','right'],
-    ['KeyJ','attack'],['Space','attack']
-  ]);
-  addEventListener('keydown',e=>{ const k=keys.get(e.code); if(k){ input[k]=true; if(['attack'].includes(k)) e.preventDefault(); }});
-  addEventListener('keyup',e=>{ const k=keys.get(e.code); if(k) input[k]=false; });
-
-  // Touch controls
-  for (const el of document.querySelectorAll('.btnDir')){
-    const dir = el.dataset.dir;
-    const on = ()=> input[dir]=true;
-    const off = ()=> input[dir]=false;
-    el.addEventListener('touchstart', e=>{ e.preventDefault(); on(); }, {passive:false});
-    el.addEventListener('touchend', off);
-    el.addEventListener('touchcancel', off);
-    el.addEventListener('mousedown', on);
-    el.addEventListener('mouseup', off);
-    el.addEventListener('mouseleave', off);
-  }
-  const btnAttack = $('#btnAttack');
-  if(btnAttack){
-    const press = ()=>{ input.attack=true; setTimeout(()=>input.attack=false, 40); };
-    btnAttack.addEventListener('touchstart', e=>{ e.preventDefault(); press(); }, {passive:false});
-    btnAttack.addEventListener('mousedown', press);
-  }
-
-  // Dialog UI
-  const dialogBox = $('#dialog');
-  let dialogTimer = 0; // frames remaining
-  function say(text, ms=2200){
-    dialogBox.textContent = text; dialogBox.classList.add('show');
-    dialogTimer = Math.ceil(ms/16);
-  }
-  $('#helpBtn').addEventListener('click',()=>{
-    say('操作：WASD/矢印で移動、Jまたはスペースで攻撃（会話/宝箱）。草を刈るとルピー！ NPCに近づいてJで会話。水と木は通れません。');
-  });
-
-  // ====== Map Generation ======
-  const MAP_W = 64, MAP_H = 64;
-  // Tiles: 0=草,1=木(壁),2=水(壁),3=背の高い草(壊れる)
-  const map = Array.from({length:MAP_H},(_,y)=>Array.from({length:MAP_W},(_,x)=>0));
-  // Border walls
-  for(let y=0;y<MAP_H;y++)for(let x=0;x<MAP_W;x++){
-    if(x===0||y===0||x===MAP_W-1||y===MAP_H-1) map[y][x]=1;
-  }
-  // Lakes
-  for(let i=0;i<8;i++){
-    const cx=rand(6,MAP_W-6), cy=rand(6,MAP_H-6), r=rand(2,4);
-    for(let y=-r;y<=r;y++)for(let x=-r;x<=r;x++){
-      if(x*x+y*y<=r*r && map[cy+y] && map[cy+y][cx+x]!==undefined) map[cy+y][cx+x]=2;
-    }
-  }
-  // Forest blobs
-  for(let i=0;i<30;i++){
-    const cx=rand(3,MAP_W-4), cy=rand(3,MAP_H-4), r=rand(1,3);
-    for(let y=-r;y<=r;y++)for(let x=-r;x<=r;x++){
-      if(Math.abs(x)+Math.abs(y)<=r && map[cy+y] && map[cy+y][cx+x]!==undefined) map[cy+y][cx+x]=1;
-    }
-  }
-  // Tall grass patches
-  for(let i=0;i<50;i++){
-    const cx=rand(2,MAP_W-3), cy=rand(2,MAP_H-3), r=rand(1,2);
-    for(let y=-r;y<=r;y++)for(let x=-r;x<=r;x++){
-      if(x*x+y*y<=r*r && map[cy+y] && map[cy+y][cx+x]===0) map[cy+y][cx+x]=3;
-    }
-  }
-
-  // ====== Entities ======
-  const entities = [];
-  function addNPC(tx,ty,msg){ entities.push({type:'npc', x:tx*TILE+8, y:ty*TILE+12, w:10, h:12, msg}); }
-  function addChest(tx,ty,loot){ entities.push({type:'chest', x:tx*TILE+4, y:ty*TILE+8, w:12, h:12, opened:false, loot}); }
-
-  // Place a small village area (clear grass)
-  const village = {x:8,y:8,w:10,h:8};
-  for(let y=village.y;y<village.y+village.h;y++){
-    for(let x=village.x;x<village.x+village.w;x++){
-      if(map[y] && map[y][x]!==undefined) map[y][x]=0;
-    }
-  }
-  addNPC(village.x+4, village.y+3, 'ようこそ、はじまりの原っぱへ！ 草を刈ってお小遣いを稼ごう。');
-  addNPC(village.x+7, village.y+5, '宝箱はJで開けられるよ。水と木は通れないから気をつけて！');
-  addChest(village.x+5, village.y+2, {rupees:5});
-
-  // Random chests
-  for(let i=0;i<6;i++){
-    const rx=rand(2,MAP_W-3), ry=rand(2,MAP_H-3);
-    if(map[ry][rx]===0) addChest(rx,ry,{rupees:rand(1,3)});
-  }
-
-  // ====== Player ======
-  const player = {
-    x:(village.x+2)*TILE+8,
-    y:(village.y+4)*TILE+8,
-    w:10, h:12,
-    spd:1.2,
-    dir:'down', // 'up'|'down'|'left'|'right'
-    attacking:false,
-    atkTimer:0,
-    hearts:3, maxHearts:3,
-    rupees: Number(localStorage.getItem('rupees')||0)
-  };
-
-  function save(){ localStorage.setItem('rupees', String(player.rupees)); }
-
-  // ====== Collision ======
-  function tileAt(px,py){
-    const tx = Math.floor(px/TILE), ty = Math.floor(py/TILE);
-    if(tx<0||ty<0||tx>=MAP_W||ty>=MAP_H) return 1; // treat out of bounds as wall
-    return map[ty][tx];
-  }
-  function blocked(px,py,w,h){
-    // check four corners
-    const corners = [
-      [px,py], [px+w,py], [px,py+h], [px+w,py+h]
-    ];
-    for(const [cx,cy] of corners){
-      const t = tileAt(cx,cy);
-      if(t===1||t===2) return true;
-    }
-    return false;
-  }
-
-  // ====== Rendering (tiny software sprites) ======
-  const draw = {
-    rect:(x,y,w,h,fill,stroke)=>{ ctx.fillStyle=fill; ctx.fillRect(x,y,w,h); if(stroke){ ctx.strokeStyle=stroke; ctx.strokeRect(x+.5,y+.5,w-1,h-1);} },
-    tile:(x,y,t)=>{
-      // Grass base
-      if(t===0){
-        ctx.fillStyle = '#1b4d2b'; ctx.fillRect(x,y,TILE,TILE);
-        ctx.fillStyle = '#226a38'; for(let i=0;i<4;i++){ ctx.fillRect(x+rand(1,12), y+rand(1,12), 2,2);}        
-      } else if(t===1){ // Tree/Wall
-        ctx.fillStyle = '#214b1f'; ctx.fillRect(x,y,TILE,TILE);
-        ctx.fillStyle = '#163417'; ctx.fillRect(x+2,y+2,12,12);
-      } else if(t===2){ // Water
-        ctx.fillStyle = '#0b3a6b'; ctx.fillRect(x,y,TILE,TILE);
-        ctx.fillStyle = '#0e58a5'; ctx.fillRect(x+1,y+1,TILE-2,TILE-2);
-      } else if(t===3){ // Tall grass (breakable)
-        ctx.fillStyle = '#1f5b2f'; ctx.fillRect(x,y,TILE,TILE);
-        ctx.fillStyle = '#2a7d40'; for(let i=0;i<6;i++){ ctx.fillRect(x+rand(1,12), y+rand(1,12), 2,2);}        
-      }
-    },
-    player:(x,y,dir,attack)=>{
-      // body
-      ctx.fillStyle = '#fef3c7'; ctx.fillRect(x-5, y-10, 10, 10); // head
-      ctx.fillStyle = '#10b981'; ctx.fillRect(x-6, y, 12, 12); // tunic
-      // eyes
-      ctx.fillStyle = '#0f172a'; if(dir==='left') ctx.fillRect(x-4,y-6,2,2); else if(dir==='right') ctx.fillRect(x+2,y-6,2,2); else ctx.fillRect(x-2,y-6,4,2);
-      // sword (simple line)
-      if(attack){
-        ctx.strokeStyle = '#d1d5db'; ctx.lineWidth=2;
-        ctx.beginPath();
-        if(dir==='up'){ ctx.moveTo(x, y-12); ctx.lineTo(x, y-20); }
-        else if(dir==='down'){ ctx.moveTo(x, y+12); ctx.lineTo(x, y+20); }
-        else if(dir==='left'){ ctx.moveTo(x-8, y+2); ctx.lineTo(x-18, y+2); }
-        else { ctx.moveTo(x+8, y+2); ctx.lineTo(x+18, y+2); }
-        ctx.stroke();
-      }
-    },
-    npc:(e)=>{
-      ctx.fillStyle = '#eab308'; ctx.fillRect(e.x-5,e.y-10,10,10); // head
-      ctx.fillStyle = '#334155'; ctx.fillRect(e.x-6,e.y,12,12); // robe
-      // name bubble
-      ctx.fillStyle = '#94a3b8'; ctx.fillRect(e.x-6,e.y-14,12,3);
-    },
-    chest:(e)=>{
-      ctx.fillStyle = e.opened ? '#6b7280' : '#b45309';
-      ctx.fillRect(e.x, e.y, 12, 10);
-      ctx.fillStyle = '#78350f'; ctx.fillRect(e.x+1, e.y+6, 10, 2);
-      if(!e.opened){ ctx.fillStyle = '#fde68a'; ctx.fillRect(e.x+5, e.y+4, 2, 3); }
-    },
-    hud:()=>{
-      // hearts
-      for(let i=0;i<player.maxHearts;i++){
-        const x = 10 + i*14, y=8;
-        ctx.fillStyle = i<player.hearts? '#ef4444' : '#475569';
-        ctx.fillRect(x,y,10,8);
-      }
-      // rupees
-      ctx.fillStyle='#34d399'; ctx.fillRect( VW-80, 8, 10, 10 );
-      ctx.fillStyle='#cbd5e1'; ctx.font='8px ui-sans-serif'; ctx.fillText('x ' + player.rupees, VW-64, 16);
-    }
-  };
-
-  // ====== Camera ======
-  const camera = {x:0,y:0};
-  function centerCamera(){
-    camera.x = Math.floor(player.x - VW/2); camera.y = Math.floor(player.y - VH/2);
-    camera.x = Math.max(0, Math.min(camera.x, MAP_W*TILE - VW));
-    camera.y = Math.max(0, Math.min(camera.y, MAP_H*TILE - VH));
-  }
-
-  // ====== Attack & Interactions ======
-  function doAttack(){
-    if(player.attacking) return;
-    player.attacking = true; player.atkTimer = 8; // ~130ms
-    // Hitbox
-    const range = 14;
-    let hx=player.x, hy=player.y, hw=12, hh=12;
-    if(player.dir==='up'){ hy-=range; hh=12; }
-    else if(player.dir==='down'){ hy+=range; hh=12; }
-    else if(player.dir==='left'){ hx-=range; hw=12; }
-    else { hx+=range; hw=12; }
-
-    // Destroy tall grass => rupee
-    const tx = Math.floor(hx/TILE), ty = Math.floor(hy/TILE);
-    for(let y=-1;y<=1;y++)for(let x=-1;x<=1;x++){
-      const gx = tx+x, gy = ty+y;
-      if(map[gy] && map[gy][gx]===3){ map[gy][gx]=0; if(Math.random()<0.5){ player.rupees++; save(); } }
-    }
-
-    // Interact with nearby entities
-    for(const e of entities){
-      if(Math.abs(e.x - player.x) < 16 && Math.abs(e.y - player.y) < 16){
-        if(e.type==='npc'){
-          say(e.msg);
-        } else if(e.type==='chest' && !e.opened){
-          e.opened = true; const get = e.loot?.rupees||0; player.rupees += get; save();
-          say(`宝箱：ルピー ${get} 枚を手に入れた！`);
+        // モバイル検出
+        function isMobile() {
+            return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
         }
-      }
-    }
-  }
 
-  // ====== Game Loop ======
-  function step(){
-    // Input -> velocity
-    let vx = (input.right?1:0) - (input.left?1:0);
-    let vy = (input.down?1:0) - (input.up?1:0);
-    if(vx||vy){
-      if(Math.abs(vx)>Math.abs(vy)) player.dir = vx>0?'right':'left';
-      else player.dir = vy>0?'down':'up';
-    }
+        // ゲーム初期化
+        function initGame() {
+            canvas = document.getElementById('gameCanvas');
+            ctx = canvas.getContext('2d');
+            
+            // モバイル対応
+            if (isMobile()) {
+                document.getElementById('mobileControls').style.display = 'flex';
+            }
+            
+            // Canvas サイズ調整
+            adjustCanvasSize();
+            window.addEventListener('resize', adjustCanvasSize);
+            window.addEventListener('orientationchange', () => {
+                setTimeout(adjustCanvasSize, 100);
+            });
+            
+            // キーボードイベント設定
+            setupKeyboardEvents();
+            
+            // モバイルコントロール設定
+            setupMobileControls();
+            
+            // ゲーム開始ボタンイベント
+            document.getElementById('startButton').addEventListener('click', startGame);
+            document.getElementById('restartButton').addEventListener('click', restartGame);
+            document.getElementById('nextButton').addEventListener('click', nextRound);
+            
+            // 初期マップ生成
+            generateMap();
+            initPlayer();
+            generateEnemies();
+            
+            // ゲームループ開始
+            gameLoop();
+        }
 
-    const speed = player.spd * (input.up||input.down||input.left||input.right?1:0);
-    // move X
-    let nx = player.x + vx*speed; if(!blocked(nx-player.w/2, player.y-player.h/2, player.w, player.h)) player.x=nx;
-    // move Y
-    let ny = player.y + vy*speed; if(!blocked(player.x-player.w/2, ny-player.h/2, player.w, player.h)) player.y=ny;
+        // Canvas サイズ調整
+        function adjustCanvasSize() {
+            const container = document.getElementById('gameContainer');
+            const canvas = document.getElementById('gameCanvas');
+            
+            const maxWidth = container.clientWidth - 20;
+            const maxHeight = isMobile() ? 
+                container.clientHeight - 200 : 
+                container.clientHeight - 120;
+            
+            const aspectRatio = GAME_CONFIG.CANVAS_WIDTH / GAME_CONFIG.CANVAS_HEIGHT;
+            
+            let newWidth = Math.min(maxWidth, GAME_CONFIG.CANVAS_WIDTH);
+            let newHeight = newWidth / aspectRatio;
+            
+            if (newHeight > maxHeight) {
+                newHeight = maxHeight;
+                newWidth = newHeight * aspectRatio;
+            }
+            
+            canvas.style.width = `${newWidth}px`;
+            canvas.style.height = `${newHeight}px`;
+        }
 
-    if(input.attack) doAttack();
-    if(player.attacking){ player.atkTimer--; if(player.atkTimer<=0){ player.attacking=false; }}
+        // キーボードイベント設定
+        function setupKeyboardEvents() {
+            document.addEventListener('keydown', (e) => {
+                e.preventDefault();
+                keys[e.key.toLowerCase()] = true;
+                
+                // 爆弾設置
+                if ((e.key === 'a' || e.key === ' ') && gameState.isGameRunning && !gameState.isPaused) {
+                    placeBomb();
+                }
+                
+                // ポーズ
+                if (e.key === 'p' && gameState.isGameRunning) {
+                    togglePause();
+                }
+            });
+            
+            document.addEventListener('keyup', (e) => {
+                e.preventDefault();
+                keys[e.key.toLowerCase()] = false;
+            });
+        }
 
-    if(dialogTimer>0){ dialogTimer--; if(dialogTimer===0){ dialogBox.classList.remove('show'); }}
+        // モバイルコントロール設定
+        function setupMobileControls() {
+            const buttons = ['upBtn', 'downBtn', 'leftBtn', 'rightBtn'];
+            const keyMap = {
+                'upBtn': 'arrowup',
+                'downBtn': 'arrowdown',
+                'leftBtn': 'arrowleft',
+                'rightBtn': 'arrowright'
+            };
 
-    centerCamera();
-  }
+            buttons.forEach(btnId => {
+                const btn = document.getElementById(btnId);
+                const key = keyMap[btnId];
+                
+                btn.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    keys[key] = true;
+                    btn.style.transform = btn.id.includes('up') || btn.id.includes('down') 
+                        ? 'translateX(-50%) scale(0.95)' 
+                        : 'translateY(-50%) scale(0.95)';
+                });
+                
+                btn.addEventListener('touchend', (e) => {
+                    e.preventDefault();
+                    keys[key] = false;
+                    btn.style.transform = btn.id.includes('up') || btn.id.includes('down') 
+                        ? 'translateX(-50%) scale(1)' 
+                        : 'translateY(-50%) scale(1)';
+                });
+                
+                // マウスイベントも追加（デスクトップでのテスト用）
+                btn.addEventListener('mousedown', (e) => {
+                    e.preventDefault();
+                    keys[key] = true;
+                });
+                
+                btn.addEventListener('mouseup', (e) => {
+                    e.preventDefault();
+                    keys[key] = false;
+                });
+                
+                btn.addEventListener('mouseleave', (e) => {
+                    keys[key] = false;
+                });
+            });
+            
+            // アクションボタン
+            document.getElementById('bombBtn').addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                if (gameState.isGameRunning && !gameState.isPaused) {
+                    placeBomb();
+                }
+            });
+            
+            document.getElementById('bombBtn').addEventListener('click', (e) => {
+                e.preventDefault();
+                if (gameState.isGameRunning && !gameState.isPaused) {
+                    placeBomb();
+                }
+            });
+            
+            document.getElementById('pauseBtn').addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                if (gameState.isGameRunning) {
+                    togglePause();
+                }
+            });
+            
+            document.getElementById('pauseBtn').addEventListener('click', (e) => {
+                e.preventDefault();
+                if (gameState.isGameRunning) {
+                    togglePause();
+                }
+            });
+        }
 
-  function render(){
-    ctx.clearRect(0,0,VW,VH);
-    // draw tiles (only visible)
-    const sx = Math.floor(camera.x/TILE), sy = Math.floor(camera.y/TILE);
-    const ex = Math.ceil((camera.x+VW)/TILE), ey = Math.ceil((camera.y+VH)/TILE);
-    for(let ty=sy; ty<ey; ty++){
-      for(let tx=sx; tx<ex; tx++){
-        const t = (map[ty]&&map[ty][tx]!==undefined)? map[ty][tx]:1;
-        draw.tile(tx*TILE-camera.x, ty*TILE-camera.y, t);
-      }
-    }
-    // entities
-    for(const e of entities){
-      const exx = e.x - camera.x, eyy = e.y - camera.y;
-      if(exx<-20||exx>VW+20||eyy<-20||eyy>VH+20) continue;
-      if(e.type==='npc') draw.npc(e);
-      else if(e.type==='chest') draw.chest(e);
-    }
-    // player
-    draw.player(player.x - camera.x, player.y - camera.y, player.dir, player.attacking);
+        // マップ生成
+        function generateMap() {
+            gameMap = [];
+            powerUps = [];
+            
+            // マップ初期化
+            for (let y = 0; y < GAME_CONFIG.MAP_HEIGHT; y++) {
+                gameMap[y] = [];
+                for (let x = 0; x < GAME_CONFIG.MAP_WIDTH; x++) {
+                    if (x === 0 || y === 0 || x === GAME_CONFIG.MAP_WIDTH - 1 || y === GAME_CONFIG.MAP_HEIGHT - 1) {
+                        gameMap[y][x] = 1; // 外壁
+                    } else if (x % 2 === 0 && y % 2 === 0) {
+                        gameMap[y][x] = 1; // 壊せないブロック
+                    } else {
+                        gameMap[y][x] = 0; // 空きスペース
+                    }
+                }
+            }
+            
+            // 壊せるブロックをランダム配置
+            for (let y = 1; y < GAME_CONFIG.MAP_HEIGHT - 1; y++) {
+                for (let x = 1; x < GAME_CONFIG.MAP_WIDTH - 1; x++) {
+                    if (gameMap[y][x] === 0) {
+                        // プレイヤー開始位置周辺は空けておく
+                        if ((x <= 2 && y <= 2) || (x >= GAME_CONFIG.MAP_WIDTH - 3 && y >= GAME_CONFIG.MAP_HEIGHT - 3)) {
+                            continue;
+                        }
+                        
+                        if (Math.random() < 0.6) {
+                            gameMap[y][x] = 2; // 壊せるブロック
+                            
+                            // アイテムを隠す（確率）
+                            if (Math.random() < 0.3) {
+                                const itemType = Math.floor(Math.random() * 3) + 1;
+                                powerUps.push({
+                                    x: x * GAME_CONFIG.TILE_SIZE,
+                                    y: y * GAME_CONFIG.TILE_SIZE,
+                                    width: GAME_CONFIG.TILE_SIZE,
+                                    height: GAME_CONFIG.TILE_SIZE,
+                                    type: itemType,
+                                    hidden: true
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // 出口設置
+            exit = {
+                x: (GAME_CONFIG.MAP_WIDTH - 2) * GAME_CONFIG.TILE_SIZE,
+                y: (GAME_CONFIG.MAP_HEIGHT - 2) * GAME_CONFIG.TILE_SIZE,
+                width: GAME_CONFIG.TILE_SIZE,
+                height: GAME_CONFIG.TILE_SIZE,
+                visible: false
+            };
+        }
 
-    // HUD
-    draw.hud();
-  }
+        // プレイヤー初期化
+        function initPlayer() {
+            player = {
+                x: GAME_CONFIG.TILE_SIZE,
+                y: GAME_CONFIG.TILE_SIZE,
+                width: GAME_CONFIG.TILE_SIZE - 4,
+                height: GAME_CONFIG.TILE_SIZE - 4,
+                speed: 2 * gameState.playerPowerUps.speed,
+                alive: true,
+                invulnerable: false,
+                invulnerableTime: 0
+            };
+        }
 
-  function loop(){ step(); render(); requestAnimationFrame(loop); }
-  loop();
+        // 敵生成
+        function generateEnemies() {
+            enemies = [];
+            const enemyCount = Math.min(2 + Math.floor(gameState.round / 2), 6);
+            
+            for (let i = 0; i < enemyCount; i++) {
+                let x, y, attempts = 0;
+                do {
+                    x = Math.floor(Math.random() * (GAME_CONFIG.MAP_WIDTH - 2)) + 1;
+                    y = Math.floor(Math.random() * (GAME_CONFIG.MAP_HEIGHT - 2)) + 1;
+                    attempts++;
+                } while ((gameMap[y][x] !== 0 || (x <= 2 && y <= 2)) && attempts < 50);
+                
+                if (attempts < 50) {
+                    enemies.push({
+                        x: x * GAME_CONFIG.TILE_SIZE,
+                        y: y * GAME_CONFIG.TILE_SIZE,
+                        width: GAME_CONFIG.TILE_SIZE - 4,
+                        height: GAME_CONFIG.TILE_SIZE - 4,
+                        speed: 1 + Math.random() * 0.5 + (gameState.round * 0.1),
+                        direction: Math.floor(Math.random() * 4),
+                        type: Math.floor(Math.random() * 3) + 1,
+                        alive: true,
+                        moveTimer: Math.floor(Math.random() * 30)
+                    });
+                }
+            }
+        }
 
-  // Show help at start (once)
-  if(!localStorage.getItem('zelda_help_shown')){
-    setTimeout(()=>{
-      say('操作：WASD/矢印で移動、J/スペースで攻撃（会話/宝箱）。草を刈るとルピー。もう一度❓でヘルプ。');
-      localStorage.setItem('zelda_help_shown','1');
-    }, 400);
-  }
-  </script>
+        // ゲーム開始
+        function startGame() {
+            gameState.isGameRunning = true;
+            document.getElementById('startScreen').style.display = 'none';
+            updateUI();
+        }
+
+        // ゲーム再開始
+        function restartGame() {
+            gameState = {
+                round: 1,
+                lives: 3,
+                score: 0,
+                isGameRunning: true,
+                isPaused: false,
+                isGameOver: false,
+                playerPowerUps: {
+                    bombCount: 1,
+                    firepower: 1,
+                    speed: 1.0
+                }
+            };
+            
+            bombs = [];
+            explosions = [];
+            
+            document.getElementById('gameOverScreen').style.display = 'none';
+            generateMap();
+            initPlayer();
+            generateEnemies();
+            updateUI();
+        }
+
+        // 次のラウンド
+        function nextRound() {
+            gameState.round++;
+            bombs = [];
+            explosions = [];
+            
+            document.getElementById('clearScreen').style.display = 'none';
+            generateMap();
+            initPlayer();
+            generateEnemies();
+            updateUI();
+        }
+
+        // ポーズ切り替え
+        function togglePause() {
+            gameState.isPaused = !gameState.isPaused;
+        }
+
+        // 爆弾設置
+        function placeBomb() {
+            if (bombs.filter(b => !b.exploded).length >= gameState.playerPowerUps.bombCount) {
+                return;
+            }
+            
+            const gridX = Math.floor((player.x + player.width/2) / GAME_CONFIG.TILE_SIZE);
+            const gridY = Math.floor((player.y + player.height/2) / GAME_CONFIG.TILE_SIZE);
+            
+            // 既に爆弾がある場合は設置しない
+            if (bombs.some(b => b.gridX === gridX && b.gridY === gridY && !b.exploded)) {
+                return;
+            }
+            
+            bombs.push({
+                x: gridX * GAME_CONFIG.TILE_SIZE,
+                y: gridY * GAME_CONFIG.TILE_SIZE,
+                gridX: gridX,
+                gridY: gridY,
+                timer: 120, // 約2秒
+                exploded: false,
+                firepower: gameState.playerPowerUps.firepower
+            });
+        }
+
+        // 衝突判定
+        function checkCollision(rect1, rect2) {
+            return rect1.x < rect2.x + rect2.width &&
+                   rect1.x + rect1.width > rect2.x &&
+                   rect1.y < rect2.y + rect2.height &&
+                   rect1.y + rect1.height > rect2.y;
+        }
+
+        // マップ衝突判定
+        function canMoveTo(x, y, width, height) {
+            const left = Math.floor(x / GAME_CONFIG.TILE_SIZE);
+            const right = Math.floor((x + width - 1) / GAME_CONFIG.TILE_SIZE);
+            const top = Math.floor(y / GAME_CONFIG.TILE_SIZE);
+            const bottom = Math.floor((y + height - 1) / GAME_CONFIG.TILE_SIZE);
+            
+            for (let ty = top; ty <= bottom; ty++) {
+                for (let tx = left; tx <= right; tx++) {
+                    if (ty < 0 || ty >= GAME_CONFIG.MAP_HEIGHT || 
+                        tx < 0 || tx >= GAME_CONFIG.MAP_WIDTH ||
+                        gameMap[ty][tx] === 1 || gameMap[ty][tx] === 2) {
+                        return false;
+                    }
+                }
+            }
+            return true;
+        }
+
+        // プレイヤー更新
+        function updatePlayer() {
+            if (!player.alive || gameState.isPaused) return;
+            
+            let newX = player.x;
+            let newY = player.y;
+            
+            // 移動処理
+            if (keys['arrowleft']) newX -= player.speed;
+            if (keys['arrowright']) newX += player.speed;
+            if (keys['arrowup']) newY -= player.speed;
+            if (keys['arrowdown']) newY += player.speed;
+            
+            // 衝突判定
+            if (canMoveTo(newX, player.y, player.width, player.height)) {
+                player.x = newX;
+            }
+            if (canMoveTo(player.x, newY, player.width, player.height)) {
+                player.y = newY;
+            }
+            
+            // 無敵時間減少
+            if (player.invulnerable) {
+                player.invulnerableTime--;
+                if (player.invulnerableTime <= 0) {
+                    player.invulnerable = false;
+                }
+            }
+            
+            // アイテム取得判定
+            for (let i = powerUps.length - 1; i >= 0; i--) {
+                const powerUp = powerUps[i];
+                if (!powerUp.hidden && checkCollision(player, powerUp)) {
+                    collectPowerUp(powerUp);
+                    powerUps.splice(i, 1);
+                }
+            }
+            
+            // 出口判定
+            if (exit.visible && checkCollision(player, exit)) {
+                stageClear();
+            }
+        }
+
+        // パワーアップ取得
+        function collectPowerUp(powerUp) {
+            gameState.score += 100;
+            
+            switch (powerUp.type) {
+                case 1: // 爆弾追加
+                    gameState.playerPowerUps.bombCount = Math.min(gameState.playerPowerUps.bombCount + 1, 8);
+                    break;
+                case 2: // 火力アップ
+                    gameState.playerPowerUps.firepower = Math.min(gameState.playerPowerUps.firepower + 1, 8);
+                    break;
+                case 3: // スピードアップ
+                    gameState.playerPowerUps.speed = Math.min(gameState.playerPowerUps.speed + 0.2, 2.0);
+                    player.speed = 2 * gameState.playerPowerUps.speed;
+                    break;
+            }
+        }
+
+        // 敵更新
+        function updateEnemies() {
+            if (gameState.isPaused) return;
+            
+            for (let enemy of enemies) {
+                if (!enemy.alive) continue;
+                
+                enemy.moveTimer++;
+                if (enemy.moveTimer < 20 + Math.random() * 20) continue; // 移動間隔
+                
+                enemy.moveTimer = 0;
+                
+                // 簡単なAI: プレイヤーに向かう確率を上げる
+                if (Math.random() < 0.4) {
+                    const dx = player.x - enemy.x;
+                    const dy = player.y - enemy.y;
+                    
+                    if (Math.abs(dx) > Math.abs(dy)) {
+                        enemy.direction = dx > 0 ? 1 : 3; // 右 or 左
+                    } else {
+                        enemy.direction = dy > 0 ? 2 : 0; // 下 or 上
+                    }
+                } else if (Math.random() < 0.3) {
+                    enemy.direction = Math.floor(Math.random() * 4);
+                }
+                
+                let newX = enemy.x;
+                let newY = enemy.y;
+                
+                switch (enemy.direction) {
+                    case 0: newY -= enemy.speed; break; // 上
+                    case 1: newX += enemy.speed; break; // 右
+                    case 2: newY += enemy.speed; break; // 下
+                    case 3: newX -= enemy.speed; break; // 左
+                }
+                
+                // 移動可能かチェック
+                if (canMoveTo(newX, newY, enemy.width, enemy.height)) {
+                    enemy.x = newX;
+                    enemy.y = newY;
+                } else {
+                    // 壁にぶつかったら方向転換
+                    enemy.direction = Math.floor(Math.random() * 4);
+                }
+                
+                // プレイヤーとの衝突判定
+                if (checkCollision(player, enemy) && !player.invulnerable) {
+                    playerHit();
+                }
+            }
+        }
+
+        // 爆弾更新
+        function updateBombs() {
+            if (gameState.isPaused) return;
+            
+            for (let i = bombs.length - 1; i >= 0; i--) {
+                let bomb = bombs[i];
+                
+                if (bomb.exploded) continue;
+                
+                bomb.timer--;
+                
+                if (bomb.timer <= 0) {
+                    explodeBomb(bomb);
+                    bomb.exploded = true;
+                }
+            }
+        }
+
+        // 爆弾爆発
+        function explodeBomb(bomb) {
+            // 爆発エフェクト作成
+            explosions.push({
+                x: bomb.x,
+                y: bomb.y,
+                timer: 30
+            });
+            
+            // 爆風を4方向に伸ばす
+            const directions = [
+                {dx: 0, dy: -1}, // 上
+                {dx: 1, dy: 0},  // 右
+                {dx: 0, dy: 1},  // 下
+                {dx: -1, dy: 0}  // 左
+            ];
+            
+            directions.forEach(dir => {
+                for (let i = 1; i <= bomb.firepower; i++) {
+                    const fireX = bomb.gridX + (dir.dx * i);
+                    const fireY = bomb.gridY + (dir.dy * i);
+                    
+                    // マップ範囲外チェック
+                    if (fireX < 0 || fireX >= GAME_CONFIG.MAP_WIDTH || 
+                        fireY < 0 || fireY >= GAME_CONFIG.MAP_HEIGHT) {
+                        break;
+                    }
+                    
+                    // 壊せないブロックで止まる
+                    if (gameMap[fireY][fireX] === 1) {
+                        break;
+                    }
+                    
+                    // 爆発エフェクト追加
+                    explosions.push({
+                        x: fireX * GAME_CONFIG.TILE_SIZE,
+                        y: fireY * GAME_CONFIG.TILE_SIZE,
+                        timer: 30
+                    });
+                    
+                    // 壊せるブロック破壊
+                    if (gameMap[fireY][fireX] === 2) {
+                        gameMap[fireY][fireX] = 0;
+                        gameState.score += 10;
+                        
+                        // 隠れアイテムを表示
+                        for (let powerUp of powerUps) {
+                            if (powerUp.hidden && 
+                                Math.floor(powerUp.x / GAME_CONFIG.TILE_SIZE) === fireX &&
+                                Math.floor(powerUp.y / GAME_CONFIG.TILE_SIZE) === fireY) {
+                                powerUp.hidden = false;
+                            }
+                        }
+                        break; // 壊せるブロックで爆風停止
+                    }
+                }
+            });
+            
+            // 爆発範囲内の敵とプレイヤーのダメージ判定
+            checkExplosionDamage();
+        }
+
+        // 爆発ダメージ判定
+        function checkExplosionDamage() {
+            for (let explosion of explosions) {
+                // プレイヤーダメージ判定
+                if (!player.invulnerable && checkCollision(player, {
+                    x: explosion.x,
+                    y: explosion.y,
+                    width: GAME_CONFIG.TILE_SIZE,
+                    height: GAME_CONFIG.TILE_SIZE
+                })) {
+                    playerHit();
+                }
+                
+                // 敵ダメージ判定
+                for (let enemy of enemies) {
+                    if (enemy.alive && checkCollision(enemy, {
+                        x: explosion.x,
+                        y: explosion.y,
+                        width: GAME_CONFIG.TILE_SIZE,
+                        height: GAME_CONFIG.TILE_SIZE
+                    })) {
+                        enemy.alive = false;
+                        gameState.score += 200;
+                    }
+                }
+            }
+        }
+
+        // 爆発エフェクト更新
+        function updateExplosions() {
+            if (gameState.isPaused) return;
+            
+            for (let i = explosions.length - 1; i >= 0; i--) {
+                explosions[i].timer--;
+                if (explosions[i].timer <= 0) {
+                    explosions.splice(i, 1);
+                }
+            }
+        }
+
+        // プレイヤーダメージ処理
+        function playerHit() {
+            gameState.lives--;
+            player.invulnerable = true;
+            player.invulnerableTime = 120; // 2秒間無敵
+            
+            if (gameState.lives <= 0) {
+                gameOver();
+            } else {
+                // プレイヤー位置リセット
+                player.x = GAME_CONFIG.TILE_SIZE;
+                player.y = GAME_CONFIG.TILE_SIZE;
+            }
+        }
+
+        // ゲームオーバー
+        function gameOver() {
+            gameState.isGameOver = true;
+            gameState.isGameRunning = false;
+            document.getElementById('finalScore').textContent = gameState.score;
+            document.getElementById('gameOverScreen').style.display = 'block';
+        }
+
+        // ステージクリア
+        function stageClear() {
+            gameState.isGameRunning = false;
+            gameState.score += 500 + (gameState.round * 100);
+            document.getElementById('clearScore').textContent = gameState.score;
+            document.getElementById('clearScreen').style.display = 'block';
+        }
+
+        // 敵全滅チェック
+        function checkAllEnemiesDefeated() {
+            const aliveEnemies = enemies.filter(e => e.alive);
+            if (aliveEnemies.length === 0 && !exit.visible) {
+                exit.visible = true;
+            }
+        }
+
+        // UI更新
+        function updateUI() {
+            document.getElementById('round').textContent = gameState.round;
+            document.getElementById('lives').textContent = gameState.lives;
+            document.getElementById('score').textContent = gameState.score.toLocaleString();
+            document.getElementById('bombCount').textContent = gameState.playerPowerUps.bombCount;
+            document.getElementById('firepower').textContent = gameState.playerPowerUps.firepower;
+            document.getElementById('speed').textContent = gameState.playerPowerUps.speed.toFixed(1);
+        }
+
+        // 描画関数群
+        function drawMap() {
+            for (let y = 0; y < GAME_CONFIG.MAP_HEIGHT; y++) {
+                for (let x = 0; x < GAME_CONFIG.MAP_WIDTH; x++) {
+                    const tileX = x * GAME_CONFIG.TILE_SIZE;
+                    const tileY = y * GAME_CONFIG.TILE_SIZE;
+                    
+                    switch (gameMap[y][x]) {
+                        case 0: // 空きスペース
+                            ctx.fillStyle = '#2d5016';
+                            ctx.fillRect(tileX, tileY, GAME_CONFIG.TILE_SIZE, GAME_CONFIG.TILE_SIZE);
+                            // グリッド線
+                            ctx.strokeStyle = '#1a3d0f';
+                            ctx.lineWidth = 0.5;
+                            ctx.strokeRect(tileX, tileY, GAME_CONFIG.TILE_SIZE, GAME_CONFIG.TILE_SIZE);
+                            break;
+                        case 1: // 壊せないブロック
+                            ctx.fillStyle = '#555';
+                            ctx.fillRect(tileX, tileY, GAME_CONFIG.TILE_SIZE, GAME_CONFIG.TILE_SIZE);
+                            ctx.fillStyle = '#777';
+                            ctx.fillRect(tileX + 2, tileY + 2, GAME_CONFIG.TILE_SIZE - 4, GAME_CONFIG.TILE_SIZE - 4);
+                            ctx.fillStyle = '#999';
+                            ctx.fillRect(tileX + 4, tileY + 4, GAME_CONFIG.TILE_SIZE - 8, GAME_CONFIG.TILE_SIZE - 8);
+                            break;
+                        case 2: // 壊せるブロック
+                            ctx.fillStyle = '#8B4513';
+                            ctx.fillRect(tileX, tileY, GAME_CONFIG.TILE_SIZE, GAME_CONFIG.TILE_SIZE);
+                            ctx.fillStyle = '#A0522D';
+                            ctx.fillRect(tileX + 2, tileY + 2, GAME_CONFIG.TILE_SIZE - 4, GAME_CONFIG.TILE_SIZE - 4);
+                            ctx.fillStyle = '#CD853F';
+                            ctx.fillRect(tileX + 4, tileY + 4, GAME_CONFIG.TILE_SIZE - 8, GAME_CONFIG.TILE_SIZE - 8);
+                            break;
+                    }
+                }
+            }
+        }
+
+        function drawPlayer() {
+            if (!player.alive) return;
+            
+            // 無敵時は点滅
+            if (player.invulnerable && Math.floor(player.invulnerableTime / 5) % 2 === 0) {
+                return;
+            }
+            
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(player.x, player.y, player.width, player.height);
+            ctx.fillStyle = '#ffff00';
+            ctx.fillRect(player.x + 3, player.y + 3, player.width - 6, player.height - 6);
+            
+            // 顔の描画
+            ctx.fillStyle = '#000';
+            ctx.fillRect(player.x + 8, player.y + 8, 4, 4); // 左目
+            ctx.fillRect(player.x + 16, player.y + 8, 4, 4); // 右目
+            ctx.fillRect(player.x + 10, player.y + 16, 8, 2); // 口
+            
+            // 影
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+            ctx.fillRect(player.x + 2, player.y + player.height + 1, player.width - 4, 3);
+        }
+
+        function drawEnemies() {
+            enemies.forEach(enemy => {
+                if (!enemy.alive) return;
+                
+                ctx.fillStyle = '#ff0000';
+                ctx.fillRect(enemy.x, enemy.y, enemy.width, enemy.height);
+                ctx.fillStyle = '#ff6666';
+                ctx.fillRect(enemy.x + 2, enemy.y + 2, enemy.width - 4, enemy.height - 4);
+                ctx.fillStyle = '#ff9999';
+                ctx.fillRect(enemy.x + 4, enemy.y + 4, enemy.width - 8, enemy.height - 8);
+                
+                // 敵の目
+                ctx.fillStyle = '#000';
+                ctx.fillRect(enemy.x + 6, enemy.y + 6, 3, 3);
+                ctx.fillRect(enemy.x + enemy.width - 9, enemy.y + 6, 3, 3);
+                
+                // 影
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+                ctx.fillRect(enemy.x + 2, enemy.y + enemy.height + 1, enemy.width - 4, 3);
+            });
+        }
+
+        function drawBombs() {
+            bombs.forEach(bomb => {
+                if (bomb.exploded) return;
+                
+                // 爆弾の点滅
+                const blinkSpeed = bomb.timer > 30 ? 20 : 5;
+                if (Math.floor(bomb.timer / blinkSpeed) % 2 === 0) {
+                    ctx.fillStyle = '#000';
+                } else {
+                    ctx.fillStyle = '#333';
+                }
+                
+                ctx.fillRect(bomb.x + 4, bomb.y + 4, GAME_CONFIG.TILE_SIZE - 8, GAME_CONFIG.TILE_SIZE - 8);
+                
+                // 導火線
+                ctx.fillStyle = bomb.timer < 30 ? '#ff0000' : '#ffff00';
+                ctx.fillRect(bomb.x + GAME_CONFIG.TILE_SIZE/2 - 1, bomb.y + 2, 2, 6);
+                
+                // 影
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+                ctx.fillRect(bomb.x + 6, bomb.y + GAME_CONFIG.TILE_SIZE - 2, GAME_CONFIG.TILE_SIZE - 12, 4);
+            });
+        }
+
+        function drawExplosions() {
+            explosions.forEach(explosion => {
+                const alpha = explosion.timer / 30;
+                ctx.fillStyle = `rgba(255, 165, 0, ${alpha})`;
+                ctx.fillRect(explosion.x, explosion.y, GAME_CONFIG.TILE_SIZE, GAME_CONFIG.TILE_SIZE);
+                ctx.fillStyle = `rgba(255, 255, 0, ${alpha * 0.8})`;
+                ctx.fillRect(explosion.x + 4, explosion.y + 4, GAME_CONFIG.TILE_SIZE - 8, GAME_CONFIG.TILE_SIZE - 8);
+                ctx.fillStyle = `rgba(255, 255, 255, ${alpha * 0.6})`;
+                ctx.fillRect(explosion.x + 8, explosion.y + 8, GAME_CONFIG.TILE_SIZE - 16, GAME_CONFIG.TILE_SIZE - 16);
+            });
+        }
+
+        function drawPowerUps() {
+            powerUps.forEach(powerUp => {
+                if (powerUp.hidden) return;
+                
+                // アニメーション効果
+                const pulse = Math.sin(Date.now() / 200) * 0.1 + 0.9;
+                const size = (GAME_CONFIG.TILE_SIZE - 8) * pulse;
+                const offset = (GAME_CONFIG.TILE_SIZE - size) / 2;
+                
+                ctx.fillStyle = '#00ff00';
+                ctx.fillRect(powerUp.x + offset, powerUp.y + offset, size, size);
+                
+                // アイテムタイプ表示
+                ctx.fillStyle = '#fff';
+                ctx.font = 'bold 12px monospace';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                
+                let symbol = '';
+                switch (powerUp.type) {
+                    case 1: symbol = 'B'; break; // 爆弾
+                    case 2: symbol = 'F'; break; // 火力
+                    case 3: symbol = 'S'; break; // スピード
+                }
+                ctx.fillText(symbol, powerUp.x + GAME_CONFIG.TILE_SIZE/2, powerUp.y + GAME_CONFIG.TILE_SIZE/2);
+            });
+        }
+
+        function drawExit() {
+            if (!exit.visible) return;
+            
+            // アニメーション効果
+            const glow = Math.sin(Date.now() / 300) * 0.3 + 0.7;
+            
+            ctx.fillStyle = `rgba(0, 255, 255, ${glow})`;
+            ctx.fillRect(exit.x, exit.y, GAME_CONFIG.TILE_SIZE, GAME_CONFIG.TILE_SIZE);
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(exit.x + 4, exit.y + 4, GAME_CONFIG.TILE_SIZE - 8, GAME_CONFIG.TILE_SIZE - 8);
+            
+            // EXIT文字
+            ctx.fillStyle = '#000';
+            ctx.font = 'bold 8px monospace';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('EXIT', exit.x + GAME_CONFIG.TILE_SIZE/2, exit.y + GAME_CONFIG.TILE_SIZE/2);
+        }
+
+        // メイン描画
+        function draw() {
+            // 背景クリア
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, GAME_CONFIG.CANVAS_WIDTH, GAME_CONFIG.CANVAS_HEIGHT);
+            
+            drawMap();
+            drawPowerUps();
+            drawExit();
+            drawPlayer();
+            drawEnemies();
+            drawBombs();
+            drawExplosions();
+            
+            // ポーズ表示
+            if (gameState.isPaused && gameState.isGameRunning) {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+                ctx.fillRect(0, 0, GAME_CONFIG.CANVAS_WIDTH, GAME_CONFIG.CANVAS_HEIGHT);
+                
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 32px monospace';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('PAUSE', GAME_CONFIG.CANVAS_WIDTH/2, GAME_CONFIG.CANVAS_HEIGHT/2 - 20);
+                
+                ctx.font = '16px monospace';
+                ctx.fillText('Pキーまたはポーズボタンで再開', GAME_CONFIG.CANVAS_WIDTH/2, GAME_CONFIG.CANVAS_HEIGHT/2 + 20);
+            }
+        }
+
+        // ゲームループ
+        function gameLoop() {
+            if (gameState.isGameRunning && !gameState.isPaused && !gameState.isGameOver) {
+                updatePlayer();
+                updateEnemies();
+                updateBombs();
+                updateExplosions();
+                checkAllEnemiesDefeated();
+                updateUI();
+            }
+            
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // ページ読み込み完了時にゲーム初期化
+        document.addEventListener('DOMContentLoaded', () => {
+            // iOS Safari対応
+            if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
+                // フルスクリーン対応
+                const meta = document.querySelector('meta[name=viewport]');
+                meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover';
+                
+                // ステータスバー対応
+                document.body.style.paddingTop = 'env(safe-area-inset-top)';
+                document.body.style.paddingBottom = 'env(safe-area-inset-bottom)';
+            }
+            
+            initGame();
+        });
+
+        // サービスワーカー登録（オフライン対応）
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                const swCode = `
+                    const CACHE_NAME = 'bomberman-v1';
+                    const urlsToCache = [
+                        '/',
+                        '/index.html'
+                    ];
+
+                    self.addEventListener('install', (event) => {
+                        event.waitUntil(
+                            caches.open(CACHE_NAME)
+                                .then((cache) => cache.addAll(urlsToCache))
+                        );
+                    });
+
+                    self.addEventListener('fetch', (event) => {
+                        event.respondWith(
+                            caches.match(event.request)
+                                .then((response) => {
+                                    return response || fetch(event.request);
+                                }
+                            )
+                        );
+                    });
+                `;
+                
+                const blob = new Blob([swCode], { type: 'application/javascript' });
+                const swUrl = URL.createObjectURL(blob);
+                
+                navigator.serviceWorker.register(swUrl)
+                    .then((registration) => {
+                        console.log('SW registered: ', registration);
+                    })
+                    .catch((registrationError) => {
+                        console.log('SW registration failed: ', registrationError);
+                    });
+            });
+        }
+    </script>
 </body>
 </html>
