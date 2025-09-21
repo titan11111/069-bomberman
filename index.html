@@ -57,6 +57,8 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
             margin-bottom: 8px;
             padding: 8px 15px;
             background: linear-gradient(90deg, #333 0%, #444 50%, #333 100%);
@@ -70,6 +72,53 @@
             flex-direction: column;
             align-items: center;
             flex: 1;
+        }
+
+        .sound-section {
+            flex: 0;
+            min-width: 72px;
+        }
+
+        .sound-button {
+            background: linear-gradient(145deg, #00aa7f 0%, #007755 100%);
+            border: 2px solid #00cc99;
+            border-radius: 12px;
+            color: #fff;
+            font-size: 16px;
+            padding: 6px 12px;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            box-shadow:
+                0 2px 8px rgba(0, 0, 0, 0.35),
+                inset 0 1px 2px rgba(255, 255, 255, 0.2);
+        }
+
+        .sound-button:hover {
+            transform: translateY(-1px);
+            box-shadow:
+                0 4px 12px rgba(0, 255, 170, 0.35),
+                inset 0 1px 3px rgba(255, 255, 255, 0.25);
+        }
+
+        .sound-button:active {
+            transform: translateY(1px);
+            box-shadow:
+                0 1px 5px rgba(0, 0, 0, 0.4),
+                inset 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .sound-button.muted {
+            background: linear-gradient(145deg, #555 0%, #333 100%);
+            border-color: #777;
+            box-shadow:
+                0 2px 6px rgba(0, 0, 0, 0.4),
+                inset 0 1px 2px rgba(255, 255, 255, 0.1);
+        }
+
+        .sound-button.disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            box-shadow: none;
         }
 
         .header-label {
@@ -526,6 +575,16 @@
                 min-width: 80px;
             }
 
+            .sound-section {
+                flex-basis: 100%;
+                align-items: center;
+            }
+
+            .sound-button {
+                font-size: 14px;
+                padding: 5px 10px;
+            }
+
             #powerUpDisplay {
                 flex-wrap: wrap;
                 gap: 3px;
@@ -639,6 +698,10 @@
                 <div class="header-label">SCORE</div>
                 <div class="header-value" id="score">0</div>
             </div>
+            <div class="header-section sound-section">
+                <div class="header-label">SOUND</div>
+                <button id="soundToggle" class="sound-button" aria-pressed="false" aria-label="サウンドON/OFF">🔊</button>
+            </div>
         </div>
 
         <!-- パワーアップアイテム表示 -->
@@ -742,6 +805,337 @@
         // キーボード入力
         let keys = {};
 
+        // オーディオ管理
+        const AudioManager = (() => {
+            const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+            if (!AudioContextClass) {
+                return {
+                    isSupported: () => false,
+                    tryResumeContext: () => {},
+                    playBGM: () => {},
+                    stopBGM: () => {},
+                    playSFX: () => {},
+                    toggleMute: () => true,
+                    isMuted: () => true,
+                    setMuted: () => true,
+                    pauseForVisibility: () => {},
+                    resumeFromVisibility: () => {}
+                };
+            }
+
+            let ctx = null;
+            let masterGain;
+            let musicGain;
+            let sfxGain;
+            let bgmSource = null;
+            let bgmBuffer = null;
+            let muted = false;
+            let bgmDesired = false;
+            let pausedForVisibility = false;
+
+            function ensureContext() {
+                if (!ctx) {
+                    ctx = new AudioContextClass();
+                    masterGain = ctx.createGain();
+                    masterGain.gain.value = 0.8;
+                    masterGain.connect(ctx.destination);
+
+                    musicGain = ctx.createGain();
+                    musicGain.gain.value = 0.3;
+                    musicGain.connect(masterGain);
+
+                    sfxGain = ctx.createGain();
+                    sfxGain.gain.value = 0.8;
+                    sfxGain.connect(masterGain);
+                }
+                return ctx;
+            }
+
+            function tryResumeContext() {
+                const audioCtx = ensureContext();
+                if (audioCtx && audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+            }
+
+            function createBGMBuffer() {
+                if (!ctx) return null;
+                const sampleRate = ctx.sampleRate;
+                const pattern = [
+                    { frequency: 196.0, duration: 0.4 },
+                    { frequency: 246.94, duration: 0.4 },
+                    { frequency: 293.66, duration: 0.4 },
+                    { frequency: 392.0, duration: 0.6 },
+                    { frequency: 329.63, duration: 0.4 },
+                    { frequency: 261.63, duration: 0.4 },
+                    { frequency: 329.63, duration: 0.4 },
+                    { frequency: 440.0, duration: 0.8 }
+                ];
+                const totalDuration = pattern.reduce((sum, note) => sum + note.duration, 0) + 0.4;
+                const bufferLength = Math.ceil(sampleRate * totalDuration);
+                const buffer = ctx.createBuffer(1, bufferLength, sampleRate);
+                const data = buffer.getChannelData(0);
+
+                let offset = 0;
+                const gapSamples = Math.floor(sampleRate * 0.02);
+
+                pattern.forEach(note => {
+                    const noteSamples = Math.floor(note.duration * sampleRate);
+                    for (let i = 0; i < noteSamples && offset + i < data.length; i++) {
+                        const phase = 2 * Math.PI * note.frequency * (i / sampleRate);
+                        const square = Math.sign(Math.sin(phase));
+                        const fadeIn = i < 100 ? i / 100 : 1;
+                        const fadeOut = i > noteSamples - 200 ? (noteSamples - i) / 200 : 1;
+                        data[offset + i] = 0.22 * square * fadeIn * fadeOut;
+                    }
+                    offset += noteSamples;
+
+                    for (let j = 0; j < gapSamples && offset + j < data.length; j++) {
+                        const fade = 1 - (j / gapSamples);
+                        data[offset + j] *= fade;
+                    }
+                    offset += gapSamples;
+                });
+
+                return buffer;
+            }
+
+            function stopCurrentBGM() {
+                if (bgmSource) {
+                    try {
+                        bgmSource.stop();
+                    } catch (e) {}
+                    bgmSource.disconnect();
+                    bgmSource = null;
+                }
+            }
+
+            function startBGMSource() {
+                if (muted) return;
+                const audioCtx = ensureContext();
+                if (!audioCtx) return;
+                if (!bgmBuffer) {
+                    bgmBuffer = createBGMBuffer();
+                }
+                if (!bgmBuffer) return;
+
+                stopCurrentBGM();
+
+                musicGain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+
+                bgmSource = audioCtx.createBufferSource();
+                bgmSource.buffer = bgmBuffer;
+                bgmSource.loop = true;
+                bgmSource.connect(musicGain);
+                const startTime = audioCtx.currentTime + 0.05;
+                bgmSource.start(startTime);
+            }
+
+            function playBGM() {
+                bgmDesired = true;
+                tryResumeContext();
+                if (!muted) {
+                    startBGMSource();
+                }
+            }
+
+            function stopBGM() {
+                bgmDesired = false;
+                stopCurrentBGM();
+            }
+
+            function pauseForVisibility() {
+                if (bgmSource) {
+                    pausedForVisibility = true;
+                    stopCurrentBGM();
+                }
+            }
+
+            function resumeFromVisibility() {
+                if (pausedForVisibility) {
+                    pausedForVisibility = false;
+                    if (bgmDesired && !muted) {
+                        startBGMSource();
+                    }
+                }
+            }
+
+            function setMuted(value) {
+                muted = value;
+                if (muted) {
+                    stopCurrentBGM();
+                } else if (bgmDesired) {
+                    tryResumeContext();
+                    startBGMSource();
+                }
+                return muted;
+            }
+
+            function toggleMute() {
+                return setMuted(!muted);
+            }
+
+            function isMuted() {
+                return muted;
+            }
+
+            function playToneSequence(sequence, options = {}) {
+                if (muted) return;
+                const audioCtx = ensureContext();
+                if (!audioCtx) return;
+                tryResumeContext();
+
+                let time = audioCtx.currentTime + (options.delay || 0.02);
+
+                sequence.forEach(note => {
+                    const duration = note.duration || 0.2;
+                    const frequency = note.frequency || 440;
+                    const gainLevel = note.volume ?? 0.35;
+                    const waveform = note.type || 'square';
+                    const detune = note.detune || 0;
+                    const gap = note.gap ?? 0.02;
+
+                    const osc = audioCtx.createOscillator();
+                    osc.type = waveform;
+                    osc.frequency.setValueAtTime(frequency, time);
+                    if (detune !== 0) {
+                        osc.detune.setValueAtTime(detune, time);
+                    }
+
+                    const gain = audioCtx.createGain();
+                    gain.gain.setValueAtTime(0.0001, time);
+                    gain.gain.exponentialRampToValueAtTime(gainLevel, time + 0.02);
+                    gain.gain.exponentialRampToValueAtTime(0.0001, time + duration);
+
+                    osc.connect(gain).connect(sfxGain);
+                    osc.start(time);
+                    osc.stop(time + duration + 0.05);
+
+                    time += duration + gap;
+                });
+            }
+
+            function playNoiseBurst(duration = 0.3, { volume = 0.7, type = 'white' } = {}) {
+                if (muted) return;
+                const audioCtx = ensureContext();
+                if (!audioCtx) return;
+                tryResumeContext();
+
+                const length = Math.floor(audioCtx.sampleRate * duration);
+                const buffer = audioCtx.createBuffer(1, length, audioCtx.sampleRate);
+                const data = buffer.getChannelData(0);
+
+                let lastOut = 0;
+                for (let i = 0; i < length; i++) {
+                    let sample = Math.random() * 2 - 1;
+                    if (type === 'brown') {
+                        sample = (lastOut + 0.02 * sample) / 1.02;
+                        lastOut = sample;
+                        sample *= 3.5;
+                    }
+                    const envelope = Math.pow(1 - i / length, 2);
+                    data[i] = sample * envelope * volume;
+                }
+
+                const noise = audioCtx.createBufferSource();
+                noise.buffer = buffer;
+
+                const gain = audioCtx.createGain();
+                gain.gain.setValueAtTime(volume, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
+
+                noise.connect(gain).connect(sfxGain);
+                noise.start(audioCtx.currentTime);
+                noise.stop(audioCtx.currentTime + duration + 0.05);
+            }
+
+            function playSFX(name) {
+                if (muted) return;
+
+                switch (name) {
+                    case 'bombPlace':
+                        playToneSequence([
+                            { frequency: 220, duration: 0.08, volume: 0.22 },
+                            { frequency: 392, duration: 0.1, volume: 0.28 }
+                        ]);
+                        break;
+                    case 'explosion':
+                        playNoiseBurst(0.45, { volume: 0.9, type: 'white' });
+                        playToneSequence([
+                            { frequency: 110, duration: 0.25, type: 'sawtooth', volume: 0.2 }
+                        ], { delay: 0 });
+                        break;
+                    case 'powerUp':
+                        playToneSequence([
+                            { frequency: 523.25, duration: 0.12, volume: 0.28 },
+                            { frequency: 659.26, duration: 0.12, volume: 0.3 },
+                            { frequency: 783.99, duration: 0.18, volume: 0.34 }
+                        ]);
+                        break;
+                    case 'enemyDown':
+                        playToneSequence([
+                            { frequency: 392, duration: 0.12, volume: 0.25 },
+                            { frequency: 523.25, duration: 0.14, volume: 0.28 }
+                        ]);
+                        break;
+                    case 'playerHit':
+                        playNoiseBurst(0.35, { volume: 0.7, type: 'brown' });
+                        playToneSequence([
+                            { frequency: 196, duration: 0.16, type: 'sawtooth', volume: 0.26 },
+                            { frequency: 155.56, duration: 0.16, type: 'sawtooth', volume: 0.22 }
+                        ], { delay: 0.02 });
+                        break;
+                    case 'stageClear':
+                        playToneSequence([
+                            { frequency: 523.25, duration: 0.16, volume: 0.3 },
+                            { frequency: 659.26, duration: 0.16, volume: 0.32 },
+                            { frequency: 783.99, duration: 0.2, volume: 0.34 },
+                            { frequency: 1046.5, duration: 0.3, volume: 0.36 }
+                        ]);
+                        break;
+                    case 'gameOver':
+                        playToneSequence([
+                            { frequency: 440, duration: 0.28, volume: 0.28 },
+                            { frequency: 349.23, duration: 0.28, volume: 0.26 },
+                            { frequency: 261.63, duration: 0.4, volume: 0.24 }
+                        ]);
+                        break;
+                    case 'start':
+                        playToneSequence([
+                            { frequency: 392, duration: 0.12, volume: 0.28 },
+                            { frequency: 523.25, duration: 0.12, volume: 0.3 },
+                            { frequency: 659.26, duration: 0.18, volume: 0.32 }
+                        ]);
+                        break;
+                    case 'roundStart':
+                        playToneSequence([
+                            { frequency: 329.63, duration: 0.12, volume: 0.26 },
+                            { frequency: 392, duration: 0.12, volume: 0.28 },
+                            { frequency: 523.25, duration: 0.16, volume: 0.3 }
+                        ]);
+                        break;
+                    case 'toggle':
+                        playToneSequence([
+                            { frequency: 440, duration: 0.1, volume: 0.22 }
+                        ]);
+                        break;
+                }
+            }
+
+            return {
+                isSupported: () => true,
+                tryResumeContext,
+                playBGM,
+                stopBGM,
+                playSFX,
+                toggleMute,
+                isMuted,
+                setMuted,
+                pauseForVisibility,
+                resumeFromVisibility
+            };
+        })();
+
         // モバイル検出
         function isMobile() {
             return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
@@ -766,10 +1160,13 @@
             
             // キーボードイベント設定
             setupKeyboardEvents();
-            
+
             // モバイルコントロール設定
             setupMobileControls();
-            
+
+            // サウンドコントロール
+            setupSoundControls();
+
             // ゲーム開始ボタンイベント
             document.getElementById('startButton').addEventListener('click', startGame);
             document.getElementById('restartButton').addEventListener('click', restartGame);
@@ -779,9 +1176,17 @@
             generateMap();
             initPlayer();
             generateEnemies();
-            
+
             // ゲームループ開始
             gameLoop();
+
+            document.addEventListener('visibilitychange', () => {
+                if (document.hidden) {
+                    AudioManager.pauseForVisibility();
+                } else if (gameState.isGameRunning && !gameState.isGameOver) {
+                    AudioManager.resumeFromVisibility();
+                }
+            });
         }
 
         // Canvas サイズ調整
@@ -907,6 +1312,60 @@
             });
         }
 
+        // サウンド制御設定
+        function setupSoundControls() {
+            const soundButton = document.getElementById('soundToggle');
+            if (!soundButton) return;
+
+            if (!AudioManager.isSupported()) {
+                soundButton.classList.add('disabled');
+                soundButton.setAttribute('disabled', 'disabled');
+                soundButton.textContent = '🔈';
+                soundButton.setAttribute('aria-pressed', 'false');
+                soundButton.setAttribute('title', 'サウンド非対応');
+                return;
+            }
+
+            const updateButtonState = () => {
+                const muted = AudioManager.isMuted();
+                soundButton.textContent = muted ? '🔇' : '🔊';
+                soundButton.setAttribute('aria-pressed', (!muted).toString());
+                soundButton.classList.toggle('muted', muted);
+                soundButton.setAttribute('title', muted ? 'サウンド: OFF' : 'サウンド: ON');
+            };
+
+            const handleToggle = (event) => {
+                event.preventDefault();
+                AudioManager.tryResumeContext();
+                const wasMuted = AudioManager.isMuted();
+                if (!wasMuted) {
+                    AudioManager.playSFX('toggle');
+                }
+                const muted = AudioManager.toggleMute();
+                if (!muted && wasMuted) {
+                    AudioManager.playSFX('toggle');
+                    if (gameState.isGameRunning && !gameState.isGameOver) {
+                        AudioManager.playBGM();
+                    }
+                }
+                updateButtonState();
+            };
+
+            soundButton.addEventListener('click', handleToggle);
+            soundButton.addEventListener('touchstart', (event) => {
+                event.preventDefault();
+                handleToggle(event);
+            }, { passive: false });
+
+            const unlockAudio = () => {
+                AudioManager.tryResumeContext();
+                document.removeEventListener('pointerdown', unlockAudio);
+            };
+            document.addEventListener('pointerdown', unlockAudio, { passive: true });
+
+            updateButtonState();
+        }
+
         // マップ生成
         function generateMap() {
             gameMap = [];
@@ -1012,6 +1471,9 @@
         function startGame() {
             gameState.isGameRunning = true;
             document.getElementById('startScreen').style.display = 'none';
+            AudioManager.tryResumeContext();
+            AudioManager.playBGM();
+            AudioManager.playSFX('start');
             updateUI();
         }
 
@@ -1035,6 +1497,9 @@
             explosions = [];
             
             document.getElementById('gameOverScreen').style.display = 'none';
+            AudioManager.tryResumeContext();
+            AudioManager.playBGM();
+            AudioManager.playSFX('start');
             generateMap();
             initPlayer();
             generateEnemies();
@@ -1048,6 +1513,9 @@
             explosions = [];
             
             document.getElementById('clearScreen').style.display = 'none';
+            AudioManager.tryResumeContext();
+            AudioManager.playBGM();
+            AudioManager.playSFX('roundStart');
             generateMap();
             initPlayer();
             generateEnemies();
@@ -1057,6 +1525,7 @@
         // ポーズ切り替え
         function togglePause() {
             gameState.isPaused = !gameState.isPaused;
+            AudioManager.playSFX('toggle');
         }
 
         // 爆弾設置
@@ -1073,6 +1542,7 @@
                 return;
             }
             
+            AudioManager.playSFX('bombPlace');
             bombs.push({
                 x: gridX * GAME_CONFIG.TILE_SIZE,
                 y: gridY * GAME_CONFIG.TILE_SIZE,
@@ -1157,6 +1627,7 @@
 
         // パワーアップ取得
         function collectPowerUp(powerUp) {
+            AudioManager.playSFX('powerUp');
             gameState.score += 100;
             
             switch (powerUp.type) {
@@ -1245,6 +1716,7 @@
 
         // 爆弾爆発
         function explodeBomb(bomb) {
+            AudioManager.playSFX('explosion');
             // 爆発エフェクト作成
             explosions.push({
                 x: bomb.x,
@@ -1328,6 +1800,7 @@
                     })) {
                         enemy.alive = false;
                         gameState.score += 200;
+                        AudioManager.playSFX('enemyDown');
                     }
                 }
             }
@@ -1347,6 +1820,7 @@
 
         // プレイヤーダメージ処理
         function playerHit() {
+            AudioManager.playSFX('playerHit');
             gameState.lives--;
             player.invulnerable = true;
             player.invulnerableTime = 120; // 2秒間無敵
@@ -1364,6 +1838,8 @@
         function gameOver() {
             gameState.isGameOver = true;
             gameState.isGameRunning = false;
+            AudioManager.stopBGM();
+            AudioManager.playSFX('gameOver');
             document.getElementById('finalScore').textContent = gameState.score;
             document.getElementById('gameOverScreen').style.display = 'block';
         }
@@ -1372,6 +1848,8 @@
         function stageClear() {
             gameState.isGameRunning = false;
             gameState.score += 500 + (gameState.round * 100);
+            AudioManager.stopBGM();
+            AudioManager.playSFX('stageClear');
             document.getElementById('clearScore').textContent = gameState.score;
             document.getElementById('clearScreen').style.display = 'block';
         }
